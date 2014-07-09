@@ -1,13 +1,13 @@
 #ifndef OBJECTSERIALIZER_H
-    #include "ObjectSerializer.h"
+#include "ObjectSerializer.h"
 #endif
 
 #ifndef OBJECTFACTORY_H
-    #include "ObjectFactory.h"
+#include "ObjectFactory.h"
 #endif
 
 #ifndef SVECTOR_H
-    #include "SVector.h"
+#include "SVector.h"
 #endif
 #include "TypeTable.h"
 #include "ObjectFormatter.h"
@@ -21,696 +21,704 @@ size_t Serialization::sm_lastSerializableObjID = 0;
 //----------------------------------------------------------------------------------------------
 ObjectSerializer::ObjectSerializer()
 {
-    InitializeDataTypes();
-    InitializeTypeTable();
+	InitializeDataTypes();
+	InitializeTypeTable();
 }
 //----------------------------------------------------------------------------------------------
 void ObjectSerializer::InitializeTypeTable()
 {
-    if(m_typeTable.empty())
-    {
-        g_ObjectFormatter.ReadTypeTable(m_typeTable);
-    }
+	if (m_typeTable.empty())
+	{
+		g_ObjectFormatter.ReadTypeTable(m_typeTable);
+	}
 }
 //----------------------------------------------------------------------------------------------
 void ObjectSerializer::InitializeDataTypes()
 {
-    m_basicTypeSize[DTYPE_Bool]     = sizeof(bool);
-    m_basicTypeSize[DTYPE_Char]     = sizeof(char);
-    m_basicTypeSize[DTYPE_Short]    = sizeof(short);
-    m_basicTypeSize[DTYPE_Int]      = sizeof(int);
-    m_basicTypeSize[DTYPE_Unsigned] = sizeof(unsigned);
-    m_basicTypeSize[DTYPE_Float]    = sizeof(float);
-    m_basicTypeSize[DTYPE_Double]   = sizeof(double);
+	m_basicTypeSize[DTYPE_Bool] = sizeof(bool);
+	m_basicTypeSize[DTYPE_Char] = sizeof(char);
+	m_basicTypeSize[DTYPE_Short] = sizeof(short);
+	m_basicTypeSize[DTYPE_Int] = sizeof(int);
+	m_basicTypeSize[DTYPE_Unsigned] = sizeof(unsigned);
+	m_basicTypeSize[DTYPE_Float] = sizeof(float);
+	m_basicTypeSize[DTYPE_Double] = sizeof(double);
 };
 //----------------------------------------------------------------------------------------------
-void ObjectSerializer::PerformLateBinding( UserObject* p_object, TypeNode*& p_type )
+void ObjectSerializer::PerformLateBinding(ISerializable* pObj, TypeNode*& pType)
 {
-    string candidateChild       = g_ObjectFactory.FromCName(p_object->CName());
-    string candidateAncestor    = p_type->FullName();
+	auto objLayout = pObj->GetObjectLayout();
+	string candidateChild = g_ObjectFactory.FromCName(objLayout.CName());
+	string candidateAncestor = pType->FullName();
 
-    if (candidateChild != candidateAncestor &&
-        IsAncestor(candidateAncestor, candidateChild))
-    {
-        p_type = m_typeTable[candidateChild].TypeGraph;
-    }
+	if (candidateChild != candidateAncestor &&
+		IsAncestor(candidateAncestor, candidateChild))
+	{
+		pType = m_typeTable[candidateChild].TypeGraph;
+	}
 }
 //----------------------------------------------------------------------------------------------
-bool ObjectSerializer::IsAncestor( const string& candidateAncestor, const string& candidateChild )
+bool ObjectSerializer::IsAncestor(const string& candidateAncestor, const string& candidateChild)
 {
-    vector<TypeNode*>&  parents     = m_typeTable[candidateChild].Parents;
-    bool                foundParent = false;
+	vector<TypeNode*>&  parents = m_typeTable[candidateChild].Parents;
+	bool                foundParent = false;
 
-    for(int pIdx = 0, pSize = parents.size(); pIdx < pSize; ++pIdx)
-    {
-        if(parents[pIdx]->FullName() == candidateAncestor)
-        {
-            foundParent = true;
-            break;
-        }
-    }
+	for (int pIdx = 0, pSize = parents.size(); pIdx < pSize; ++pIdx)
+	{
+		if (parents[pIdx]->FullName() == candidateAncestor)
+		{
+			foundParent = true;
+			break;
+		}
+	}
 
-    // Base Case: the candidate ancestor is a direct parent
-    if(foundParent)
-    {
-        return true;
-    }
-    // Inductive Case: the candidate ancestor is ancestor to one of my parents
-    else
-    {
-        for(int i = 0, size = parents.size(); i < size; ++i)
-        {
-            if(IsAncestor(candidateAncestor, parents[i]->FullName()))
-                return true;
-        }
-    }
+	// Base Case: the candidate ancestor is a direct parent
+	if (foundParent)
+	{
+		return true;
+	}
+	// Inductive Case: the candidate ancestor is ancestor to one of my parents
+	else
+	{
+		for (int i = 0, size = parents.size(); i < size; ++i)
+		{
+			if (IsAncestor(candidateAncestor, parents[i]->FullName()))
+				return true;
+		}
+	}
 
-    return false;
+	return false;
 }
 //----------------------------------------------------------------------------------------------
-void ObjectSerializer::Serialize(const UserObject* p_object, string p_objectFileName)
+void ObjectSerializer::Serialize(const ISerializable* pObject, string objFilename)
 {
-    fstream pen;
-    pen.open(p_objectFileName.c_str(), ios::binary | ios::out);
-    _ASSERTE(pen.is_open());
+	fstream pen;
+	pen.open(objFilename.c_str(), ios::binary | ios::out);
+	_ASSERTE(pen.is_open());
 
-    const string& typeName = g_ObjectFactory.FromCName(p_object->CName());
-    _ASSERTE(m_typeTable.find(typeName) != m_typeTable.end());
+	auto objLayout = const_cast<ISerializable*>(pObject)->GetObjectLayout();
+	const string& typeName = g_ObjectFactory.FromCName(objLayout.CName());
+	_ASSERTE(m_typeTable.find(typeName) != m_typeTable.end());
 
-    TypeData& typeData = m_typeTable[typeName];
-    SerializeType(reinterpret_cast<char*>(const_cast<UserObject*>(p_object)), typeData.TypeGraph, pen);
+	TypeData& typeData = m_typeTable[typeName];
+	SerializeType(reinterpret_cast<char*>(const_cast<ISerializable*>(pObject)), typeData.TypeGraph, pen);
 
-    pen.close();
+	pen.close();
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::SerializeType(char* p_fieldAddress, TypeNode* p_type, fstream& p_pen)
+int ObjectSerializer::SerializeType(char* pMem, TypeNode* pType, fstream& pen)
 {
-    switch(p_type->Type)
-    {
-    case DTYPE_Array:
-        return SerializeArray(p_fieldAddress, p_type, p_pen);
+	switch (pType->Type)
+	{
+	case DTYPE_Array:
+		return SerializeArray(pMem, pType, pen);
 
-    case DTYPE_String:
-        return SerializeString(p_fieldAddress, p_type, p_pen);
+	case DTYPE_String:
+		return SerializeString(pMem, pType, pen);
 
-    case DTYPE_Vector:
-        return SerializeContainerVector(p_fieldAddress, p_type, p_pen);
+	case DTYPE_Vector:
+		return SerializeContainerVector((ISerializable*)pMem, pType, pen);
 
-    case DTYPE_Map:
-        return SerializeContainerMap(p_fieldAddress, p_type, p_pen);
+	case DTYPE_Map:
+		return SerializeContainerMap((ISerializable*)pMem, pType, pen);
 
-    case DTYPE_Set:
-        return SerializeContainerSet(p_fieldAddress, p_type, p_pen);
+	case DTYPE_Set:
+		return SerializeContainerSet((ISerializable*)pMem, pType, pen);
 
-    case DTYPE_Pair:
-        return SerializePair(p_fieldAddress, p_type, p_pen);
+	case DTYPE_Pair:
+		return SerializePair((ISerializable*)pMem, pType, pen);
 
-    case DTYPE_UserDefined:
-        {
-            string fullName = p_type->FullName();
-            if(p_type->Indirection)
-                fullName.erase(fullName.size() - 1, 1);
+	case DTYPE_UserDefined:
+	{
+							  string fullName = pType->FullName();
+							  if (pType->Indirection)
+								  fullName.erase(fullName.size() - 1, 1);
 
-            _ASSERTE(m_typeTable.find(fullName) != m_typeTable.end());
+							  _ASSERTE(m_typeTable.find(fullName) != m_typeTable.end());
 
-            return SerializeUserDefinedType(p_fieldAddress, m_typeTable[fullName].TypeGraph, p_type->Indirection, p_pen);
-        }
-    case DTYPE_Bool:
-    case DTYPE_Char:
-    case DTYPE_Short:
-    case DTYPE_Int:
-    case DTYPE_Unsigned:
-    case DTYPE_Float:
-    case DTYPE_Double:
-        return SerializeBasicType(p_fieldAddress, p_type, p_pen);
-    }
+							  return SerializeUserDefinedType((ISerializable*)pMem, m_typeTable[fullName].TypeGraph, pType->Indirection, pen);
+	}
+	case DTYPE_Bool:
+	case DTYPE_Char:
+	case DTYPE_Short:
+	case DTYPE_Int:
+	case DTYPE_Unsigned:
+	case DTYPE_Float:
+	case DTYPE_Double:
+		return SerializeBasicType(pMem, pType, pen);
+	}
 
-    // should not reach here
-    _ASSERTE(false);
+	// should not reach here
+	_ASSERTE(false);
 
-    return 0;
+	return 0;
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::SerializeBasicType(char* p_fieldAddress, TypeNode* p_type, fstream& p_pen)
+int ObjectSerializer::SerializeBasicType(char* pMem, TypeNode* pType, fstream& pen)
 {
-    int size = m_basicTypeSize[p_type->Type];
-    bool isNull = false;
-    _ASSERTE(p_type->Children.size() == 0);
+	int size = m_basicTypeSize[pType->Type];
+	bool isNull = false;
+	_ASSERTE(pType->Children.size() == 0);
 
-    // Continuous pointers to scattered basic-type data
-    if(p_type->Indirection)
-    {
-        unsigned* addr32 = reinterpret_cast<unsigned*>(p_fieldAddress);
-        isNull = (*addr32 == NULL);
-        p_pen.write(reinterpret_cast<char*>(&isNull), sizeof(bool));
-        if(!isNull)
-        {
-            p_fieldAddress = reinterpret_cast<char*>(*addr32);
-            p_pen.write(p_fieldAddress, size);
-        }
-        size = sizeof(unsigned);
-    }
-    // Continuous basic-type data values
-    else
-    {
-        p_pen.write(p_fieldAddress, size);
-    }
+	// Continuous pointers to scattered basic-type data
+	if (pType->Indirection)
+	{
+		unsigned* addr32 = reinterpret_cast<unsigned*>(pMem);
+		isNull = (*addr32 == NULL);
+		pen.write(reinterpret_cast<char*>(&isNull), sizeof(bool));
+		if (!isNull)
+		{
+			pMem = reinterpret_cast<char*>(*addr32);
+			pen.write(pMem, size);
+		}
+		size = sizeof(unsigned);
+	}
+	// Continuous basic-type data values
+	else
+	{
+		pen.write(pMem, size);
+	}
 
-    return size;
+	return size;
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::SerializeUserDefinedType(char* p_fieldAddress, TypeNode* p_type, bool p_isPtr, fstream& p_pen)
-{ 
-    int     size = 0;
-    UserObject* object = NULL;
-    bool    isNull = false;
-    if(p_isPtr)
-    {
-        int         length = 0;
-        string      typeName;
-        char        buffer[MaxTypeNameLength + 1];
-        unsigned*   addr32 = reinterpret_cast<unsigned*>(p_fieldAddress);
-
-        isNull = (NULL == *addr32);
-        p_pen.write(reinterpret_cast<char*>(&isNull), sizeof(bool));
-
-        if(!isNull)
-        {
-            object = reinterpret_cast<UserObject*>(*addr32);
-
-            typeName = g_ObjectFactory.FromCName(object->CName());
-
-            PerformLateBinding(object, p_type);
-
-            length = typeName.size();
-            _ASSERTE(length <= MaxTypeNameLength);
-            strcpy(buffer, typeName.c_str());
-            buffer[length] = 0;
-            p_pen.write(buffer, MaxTypeNameLength + 1);
-
-            object->InitializeAddresses();
-
-            Iterator* addresses = object->GetIterator();
-            unsigned* addr32;
-            for(int memberIdx = 0; addresses->MoveNext(); ++memberIdx)    
-            {
-                _ASSERTE(memberIdx < p_type->Children.size());
-                addr32 = reinterpret_cast<unsigned*>(addresses->Current());
-                SerializeType(reinterpret_cast<char*>(*addr32), p_type->Children[memberIdx].Ptr32, p_pen);
-            }
-        }
-        size = sizeof(unsigned);
-    }
-    else
-    {
-        object = reinterpret_cast<UserObject*>(p_fieldAddress);
-        object->InitializeAddresses();
-
-        Iterator* addresses = object->GetIterator();
-        unsigned* addr32;
-        for(int memberIdx = 0; addresses->MoveNext(); ++memberIdx)    
-        {
-            _ASSERTE(memberIdx < p_type->Children.size());
-            addr32 = reinterpret_cast<unsigned*>(addresses->Current());
-            SerializeType(reinterpret_cast<char*>(*addr32), p_type->Children[memberIdx].Ptr32, p_pen);
-        }
-
-        size = object->TypeSize();
-    }
-
-    return size;
-}
-//----------------------------------------------------------------------------------------------
-int ObjectSerializer::SerializeArray(char* p_fieldAddress, TypeNode* p_type, fstream& p_pen)
+int ObjectSerializer::SerializeUserDefinedType(ISerializable *pObj, TypeNode* pType, bool isPtr, fstream& pen)
 {
-    // not supported for this time
-    _ASSERTE(false);
+	int     size = 0;
+	bool    isNull = false;
 
-    int         size = 0;
-    int         length = p_type->Children[0].Val32;
-    TypeNode*   type = p_type->Children[1].Ptr32;
-    bool        isNull = false;
+	if (isPtr)
+	{
+		// Access the pointer pointed by the pointer to pointer
+		pObj = (*(ISerializable**)pObj);
+		int         length = 0;
+		string      typeName;
+		char        buffer[MaxTypeNameLength + 1];
 
-    _ASSERTE(p_type->Children.size() == 2);
+		isNull = (NULL == pObj);
+		pen.write(reinterpret_cast<char*>(&isNull), sizeof(bool));
 
-    if(p_type->Indirection)
-    {
-        unsigned* addr32 = reinterpret_cast<unsigned*>(p_fieldAddress);
-        isNull = (*addr32 == NULL);
-        p_pen.write(reinterpret_cast<char*>(&isNull), sizeof(bool));
+		if (!isNull)
+		{
+			auto        objLayout = pObj->GetObjectLayout();
 
-        if(!isNull)
-        {
-            for(int i = 0; i < length; ++i)
-            {
-                p_fieldAddress = reinterpret_cast<char*>(*addr32);
-                SerializeType(p_fieldAddress, type, p_pen);
-                addr32++;
-            }
-        }
+			typeName = g_ObjectFactory.FromCName(objLayout.CName());
 
-        size = sizeof(unsigned) * length;
-    }
-    else
-    {
-        int s = 0;
-        for(int i = 0; i < length; ++i)
-        {
-            s = SerializeType(p_fieldAddress, type, p_pen);
-            p_fieldAddress += s;
-            size += s;
-        }
-    }
+			PerformLateBinding(pObj, pType);
 
-    return size;
+			length = typeName.size();
+			_ASSERTE(length <= MaxTypeNameLength);
+			strcpy_s(buffer, typeName.c_str());
+			buffer[length] = 0;
+			pen.write(buffer, MaxTypeNameLength + 1);
+
+			Iterator* addresses = objLayout.GetIterator();
+			unsigned* addr32;
+			for (int memberIdx = 0; addresses->MoveNext(); ++memberIdx)
+			{
+				_ASSERTE(memberIdx < pType->Children.size());
+				addr32 = reinterpret_cast<unsigned*>(addresses->Current());
+				SerializeType(reinterpret_cast<char*>(*addr32), pType->Children[memberIdx].Ptr32, pen);
+			}
+		}
+		size = sizeof(unsigned);
+	}
+	else
+	{
+		auto objLayout = pObj->GetObjectLayout();
+		Iterator* addresses = objLayout.GetIterator();
+		unsigned* addr32;
+		for (int memberIdx = 0; addresses->MoveNext(); ++memberIdx)
+		{
+			_ASSERTE(memberIdx < pType->Children.size());
+			addr32 = reinterpret_cast<unsigned*>(addresses->Current());
+			SerializeType(reinterpret_cast<char*>(*addr32), pType->Children[memberIdx].Ptr32, pen);
+		}
+
+		size = objLayout.TypeSize();
+	}
+
+	return size;
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::SerializeString(char* p_fieldAddress, TypeNode* p_type, fstream& p_pen)
+int ObjectSerializer::SerializeArray(char* pMem, TypeNode* pType, fstream& pen)
 {
-    int     length = 0;
-    int     size = NULL;
-    char*   buffer = NULL;
-    string* str = NULL;
-    bool    isNull = false;
+	// not supported for this time
+	_ASSERTE(false);
 
-    if(p_type->Indirection)
-    {
-        unsigned* addr32 = reinterpret_cast<unsigned*>(p_fieldAddress);
-        isNull = (*addr32 == NULL);
-        p_pen.write(reinterpret_cast<char*>(&isNull), sizeof(bool));
+	int         size = 0;
+	int         length = pType->Children[0].Val32;
+	TypeNode*   type = pType->Children[1].Ptr32;
+	bool        isNull = false;
 
-        if(!isNull)
-        {   
-            str = reinterpret_cast<string*>(*addr32);
-            length = str->size();
-            p_pen.write(reinterpret_cast<char*>(&length), sizeof(int));
-            buffer = const_cast<char*>(str->c_str());
-            p_pen.write(reinterpret_cast<char*>(buffer), sizeof(char) * length);
-        }
+	_ASSERTE(pType->Children.size() == 2);
 
-        size = sizeof(unsigned);
-    }
-    else
-    {
-        str = reinterpret_cast<string*>(p_fieldAddress);
-        length = str->size();
-        p_pen.write(reinterpret_cast<char*>(&length), sizeof(int));
-        buffer = const_cast<char*>(str->c_str());
-        p_pen.write(reinterpret_cast<char*>(buffer), sizeof(char) * length);
+	if (pType->Indirection)
+	{
+		unsigned* addr32 = reinterpret_cast<unsigned*>(pMem);
+		isNull = (*addr32 == NULL);
+		pen.write(reinterpret_cast<char*>(&isNull), sizeof(bool));
 
-        size = sizeof(string);
-    }
+		if (!isNull)
+		{
+			for (int i = 0; i < length; ++i)
+			{
+				pMem = reinterpret_cast<char*>(*addr32);
+				SerializeType(pMem, type, pen);
+				addr32++;
+			}
+		}
 
-    return size;
+		size = sizeof(unsigned)* length;
+	}
+	else
+	{
+		int s = 0;
+		for (int i = 0; i < length; ++i)
+		{
+			s = SerializeType(pMem, type, pen);
+			pMem += s;
+			size += s;
+		}
+	}
+
+	return size;
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::SerializeContainerVector(char* p_fieldAddress, TypeNode* p_type, fstream& p_pen)
+int ObjectSerializer::SerializeString(char* pMem, TypeNode* pType, fstream& pen)
 {
-    // Pointer to vector is not supported
-    _ASSERTE(p_type->Indirection == false);
-    _ASSERTE(p_type->TemplateArguments.size() == 1);
+	int     length = 0;
+	int     size = NULL;
+	char*   buffer = NULL;
+	string* str = NULL;
+	bool    isNull = false;
 
-    Container*  container   = reinterpret_cast<Container*>(p_fieldAddress);
-    Iterator*   itr         = container->GetIterator();
-    int         count       = container->ContainerCount();
+	if (pType->Indirection)
+	{
+		unsigned* addr32 = reinterpret_cast<unsigned*>(pMem);
+		isNull = (*addr32 == NULL);
+		pen.write(reinterpret_cast<char*>(&isNull), sizeof(bool));
 
-    p_pen.write(reinterpret_cast<char*>(&count), sizeof(int));
-    while(itr->MoveNext())
-    {
-        SerializeType(itr->Current(), p_type->TemplateArguments[0], p_pen);
-    }
+		if (!isNull)
+		{
+			str = reinterpret_cast<string*>(*addr32);
+			length = str->size();
+			pen.write(reinterpret_cast<char*>(&length), sizeof(int));
+			buffer = const_cast<char*>(str->c_str());
+			pen.write(reinterpret_cast<char*>(buffer), sizeof(char)* length);
+		}
 
-    return container->TypeSize();
+		size = sizeof(unsigned);
+	}
+	else
+	{
+		str = reinterpret_cast<string*>(pMem);
+		length = str->size();
+		pen.write(reinterpret_cast<char*>(&length), sizeof(int));
+		buffer = const_cast<char*>(str->c_str());
+		pen.write(reinterpret_cast<char*>(buffer), sizeof(char)* length);
+
+		size = sizeof(string);
+	}
+
+	return size;
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::SerializeContainerMap(char* p_fieldAddress, TypeNode* p_type, fstream& p_pen)
+int ObjectSerializer::SerializeContainerVector(ISerializable* pObj, TypeNode* pType, fstream& pen)
 {
-    // Pointer to map is not supported
-    _ASSERTE(p_type->Indirection == false);
-    _ASSERTE(p_type->TemplateArguments.size() == 1);
+	// Pointer to vector is not supported
+	_ASSERTE(pType->Indirection == false);
+	_ASSERTE(pType->TemplateArguments.size() == 1);
 
-    Container*  container   = reinterpret_cast<Container*>(p_fieldAddress);
-    Iterator*   itr         = container->GetIterator();
-    int         count       = container->ContainerCount();
+	auto		objLayout = pObj->GetObjectLayout();
+	IContainer* pContainer = dynamic_cast<IContainer*>(pObj);
+	_ASSERTE(pContainer);
+	Iterator*   itr = objLayout.GetIterator();
+	int         count = pContainer->ContainerCount();
 
-    p_pen.write(reinterpret_cast<char*>(&count), sizeof(int));
-    while(itr->MoveNext())
-    {
-        SerializeType(itr->Current(), p_type->TemplateArguments[0], p_pen);
-    }
+	pen.write(reinterpret_cast<char*>(&count), sizeof(int));
+	while (itr->MoveNext())
+	{
+		SerializeType(itr->Current(), pType->TemplateArguments[0], pen);
+	}
 
-    return container->TypeSize();
+	return objLayout.TypeSize();
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::SerializeContainerSet(char* p_fieldAddress, TypeNode* p_type, fstream& p_pen)
+int ObjectSerializer::SerializeContainerMap(ISerializable* pObj, TypeNode* pType, fstream& pen)
 {
-    // Pointer to set is not supported
-    _ASSERTE(p_type->Indirection == false);
-    _ASSERTE(p_type->TemplateArguments.size() == 1);
+	// Pointer to map is not supported
+	_ASSERTE(pType->Indirection == false);
+	_ASSERTE(pType->TemplateArguments.size() == 1);
 
-    ISerializable* serializable = reinterpret_cast<ISerializable*>(p_fieldAddress);
-    Container*  container   = dynamic_cast<Container*>(serializable);
-    Iterator*   itr         = container->GetIterator();
-    int         count       = container->ContainerCount();
+	auto        objLayout = pObj->GetObjectLayout();
+	IContainer* pContainer = dynamic_cast<IContainer*>(pObj);
+	_ASSERTE(pContainer);
+	Iterator*   itr = objLayout.GetIterator();
+	int         count = pContainer->ContainerCount();
 
-    p_pen.write(reinterpret_cast<char*>(&count), sizeof(int));
-    while(itr->MoveNext())
-    {
-        SerializeType(itr->Current(), p_type->TemplateArguments[0], p_pen);
-    }
+	pen.write(reinterpret_cast<char*>(&count), sizeof(int));
+	while (itr->MoveNext())
+	{
+		SerializeType(itr->Current(), pType->TemplateArguments[0], pen);
+	}
 
-    return container->TypeSize();
+	return objLayout.TypeSize();
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::SerializePair(char* p_fieldAddress, TypeNode* p_type, fstream& p_pen)
+int ObjectSerializer::SerializeContainerSet(ISerializable* pObj, TypeNode* pType, fstream& pen)
 {
-    // Pointer to pair is not supported
-    _ASSERTE(p_type->Indirection == false);
-    _ASSERTE(p_type->TemplateArguments.size() == 2);
+	// Pointer to set is not supported
+	_ASSERTE(pType->Indirection == false);
+	_ASSERTE(pType->TemplateArguments.size() == 1);
 
-    UserObject* object = reinterpret_cast<UserObject*>(p_fieldAddress);
-    object->InitializeAddresses();
+	auto        objLayout = pObj->GetObjectLayout();
+	IContainer* pContainer = dynamic_cast<IContainer*>(pObj);
+	_ASSERTE(pContainer);
+	Iterator*   itr = objLayout.GetIterator();
+	int         count = pContainer->ContainerCount();
 
-    Iterator* addresses = object->GetIterator();
-    unsigned* addr32;
-    for(int memberIdx = 0; addresses->MoveNext(); ++memberIdx)    
-    {
-        _ASSERTE(memberIdx < p_type->TemplateArguments.size());
-        addr32 = reinterpret_cast<unsigned*>(addresses->Current());
-        SerializeType(reinterpret_cast<char*>(*addr32), p_type->TemplateArguments[memberIdx], p_pen);
-    }
+	pen.write(reinterpret_cast<char*>(&count), sizeof(int));
+	while (itr->MoveNext())
+	{
+		SerializeType(itr->Current(), pType->TemplateArguments[0], pen);
+	}
 
-    return object->TypeSize();
+	return objLayout.TypeSize();
 }
 //----------------------------------------------------------------------------------------------
-void ObjectSerializer::Deserialize(UserObject* p_object, string p_objectFileName)
+int ObjectSerializer::SerializePair(ISerializable* pObj, TypeNode* pType, fstream& pen)
 {
-    fstream eye;
-    eye.open(p_objectFileName.c_str(), ios::binary | ios::in);
-    _ASSERTE(eye.is_open());
+	// Pointer to pair is not supported
+	_ASSERTE(pType->Indirection == false);
+	_ASSERTE(pType->TemplateArguments.size() == 2);
 
-    const string& typeName = g_ObjectFactory.FromCName(p_object->CName());
-    _ASSERTE(m_typeTable.find(typeName) != m_typeTable.end());
+	auto        objLayout = pObj->GetObjectLayout();
 
-    TypeData& typeData = m_typeTable[typeName];
-    DeserializeType(reinterpret_cast<char*>(p_object), typeData.TypeGraph, eye);
+	Iterator* addresses = objLayout.GetIterator();
+	unsigned* addr32;
+	for (int memberIdx = 0; addresses->MoveNext(); ++memberIdx)
+	{
+		_ASSERTE(memberIdx < pType->TemplateArguments.size());
+		addr32 = reinterpret_cast<unsigned*>(addresses->Current());
+		SerializeType(reinterpret_cast<char*>(*addr32), pType->TemplateArguments[memberIdx], pen);
+	}
 
-    eye.close();
+	return objLayout.TypeSize();
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::DeserializeType(char* p_fieldAddress, TypeNode* p_type, fstream& p_eye)
+void ObjectSerializer::Deserialize(ISerializable* pObj, string objectFileName)
 {
-    switch(p_type->Type)
-    {
-    case DTYPE_Array:
-        return DeserializeArray(p_fieldAddress, p_type, p_eye);
+	fstream eye;
+	eye.open(objectFileName.c_str(), ios::binary | ios::in);
+	_ASSERTE(eye.is_open());
+	_ASSERTE(pObj);
 
-    case DTYPE_String:
-        return DeserializeString(p_fieldAddress, p_type, p_eye);
+	auto objLayout = pObj->GetObjectLayout();
+	const string& typeName = g_ObjectFactory.FromCName(objLayout.CName());
+	_ASSERTE(m_typeTable.find(typeName) != m_typeTable.end());
 
-    case DTYPE_Vector:
-        return DeserializeContainerVector(p_fieldAddress, p_type, p_eye);
+	TypeData& typeData = m_typeTable[typeName];
+	DeserializeType(reinterpret_cast<char*>(pObj), typeData.TypeGraph, eye);
 
-    case DTYPE_Map:
-        return DeserializeContainerMap(p_fieldAddress, p_type, p_eye);
-    
-    case DTYPE_Set:
-        return DeserializeContainerSet(p_fieldAddress, p_type, p_eye);
-
-    case DTYPE_Pair:
-        return DeserializePair(p_fieldAddress, p_type, p_eye);
-
-    case DTYPE_UserDefined:
-        {
-            string fullName = p_type->FullName();
-            if(p_type->Indirection)
-                fullName.erase(fullName.size() - 1, 1);
-
-            _ASSERTE(m_typeTable.find(fullName) != m_typeTable.end());
-            return DeserializeUserDefinedType(p_fieldAddress, m_typeTable[fullName].TypeGraph, p_type->Indirection, p_eye);
-        }
-
-    case DTYPE_Bool:
-    case DTYPE_Char:
-    case DTYPE_Short:
-    case DTYPE_Int:
-    case DTYPE_Unsigned:
-    case DTYPE_Float:
-    case DTYPE_Double:
-        return DeserializeBasicType(p_fieldAddress, p_type, p_eye);
-    }
-
-    return 0;
+	eye.close();
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::DeserializeBasicType(char* p_fieldAddress, TypeNode* p_type, fstream& p_eye)
+int ObjectSerializer::DeserializeType(char* pMem, TypeNode* pType, fstream& eye)
 {
-    int size = m_basicTypeSize[p_type->Type];
-    bool isNull = false;
+	switch (pType->Type)
+	{
+	case DTYPE_Array:
+		return DeserializeArray(pMem, pType, eye);
 
-    if(p_type->Indirection)
-    {
-        p_eye.read(reinterpret_cast<char*>(&isNull), sizeof(bool));
-        char* memChunk = NULL;
-        if(!isNull)
-        {
-            memChunk = new char[size];
-            p_eye.read(memChunk, size);
-        }
+	case DTYPE_String:
+		return DeserializeString(pMem, pType, eye);
 
-        unsigned* addr32 = reinterpret_cast<unsigned*>(p_fieldAddress);
-        *addr32 = reinterpret_cast<unsigned>(memChunk);
+	case DTYPE_Vector:
+		return DeserializeContainerVector((ISerializable*)pMem, pType, eye);
 
-        size = sizeof(unsigned);
-    }
-    else
-    {   
-        p_eye.read(p_fieldAddress, size);
-    }
+	case DTYPE_Map:
+		return DeserializeContainerMap((ISerializable*)pMem, pType, eye);
 
-    return size;
+	case DTYPE_Set:
+		return DeserializeContainerSet((ISerializable*)pMem, pType, eye);
+
+	case DTYPE_Pair:
+		return DeserializePair((ISerializable*)pMem, pType, eye);
+
+	case DTYPE_UserDefined:
+	{
+							  string fullName = pType->FullName();
+							  if (pType->Indirection)
+								  fullName.erase(fullName.size() - 1, 1);
+
+							  _ASSERTE(m_typeTable.find(fullName) != m_typeTable.end());
+							  return DeserializeUserDefinedType((ISerializable*)pMem, m_typeTable[fullName].TypeGraph, pType->Indirection, eye);
+	}
+
+	case DTYPE_Bool:
+	case DTYPE_Char:
+	case DTYPE_Short:
+	case DTYPE_Int:
+	case DTYPE_Unsigned:
+	case DTYPE_Float:
+	case DTYPE_Double:
+		return DeserializeBasicType(pMem, pType, eye);
+	}
+
+	return 0;
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::DeserializeUserDefinedType(char* p_fieldAddress, TypeNode* p_type, bool p_isPtr, fstream& p_eye)
-{ 
-    int     size = 0;
-    UserObject* object = NULL;
-    bool    isNull = false;
-
-    if(p_isPtr)
-    {
-        unsigned* addr32;
-        p_eye.read(reinterpret_cast<char*>(&isNull), sizeof(bool));
-        addr32 = reinterpret_cast<unsigned*>(p_fieldAddress);
-
-        if(!isNull)
-        {
-            string  typeName;
-            char    buffer[MaxTypeNameLength + 1];
-
-            p_eye.read(buffer, MaxTypeNameLength + 1);
-            typeName = buffer;
-            object = static_cast<UserObject*>(g_ObjectFactory.Create(typeName));
-
-            PerformLateBinding(object, p_type);
-
-            object->InitializeAddresses();
-
-            Iterator* addresses = object->GetIterator();
-            unsigned* addr32;
-            for(int memberIdx = 0; addresses->MoveNext(); ++memberIdx)    
-            {
-                _ASSERTE(memberIdx < p_type->Children.size());
-                addr32 = reinterpret_cast<unsigned*>(addresses->Current());
-                DeserializeType(reinterpret_cast<char*>(*addr32), p_type->Children[memberIdx].Ptr32, p_eye);
-            }
-        }
-        
-        *addr32 = reinterpret_cast<unsigned>(object);
-        size = sizeof(unsigned);
-    }
-    else
-    {
-        object = reinterpret_cast<UserObject*>(p_fieldAddress);
-        object->InitializeAddresses();
-    
-        Iterator* addresses = object->GetIterator();
-        unsigned* addr32;
-        for(int memberIdx = 0; addresses->MoveNext(); ++memberIdx)    
-        {
-            _ASSERTE(memberIdx < p_type->Children.size());
-            addr32 = reinterpret_cast<unsigned*>(addresses->Current());
-            DeserializeType(reinterpret_cast<char*>(*addr32), p_type->Children[memberIdx].Ptr32, p_eye);
-        }
-
-        size = object->TypeSize();
-    }
-
-    return size;
-}
-//----------------------------------------------------------------------------------------------
-int ObjectSerializer::DeserializeArray(char* p_fieldAddress, TypeNode* p_type, fstream& p_eye)
+int ObjectSerializer::DeserializeBasicType(char* pMem, TypeNode* pType, fstream& eye)
 {
-    int         size = 0;
-    int         length = p_type->Children[0].Val32;
-    TypeNode*   type = p_type->Children[1].Ptr32;
-    bool        isNull = false;
+	int size = m_basicTypeSize[pType->Type];
+	bool isNull = false;
 
-    if(p_type->Indirection)
-    {
-        unsigned* addr32 = reinterpret_cast<unsigned*>(p_fieldAddress);
-        *addr32 = NULL;
+	if (pType->Indirection)
+	{
+		eye.read(reinterpret_cast<char*>(&isNull), sizeof(bool));
+		char* memChunk = NULL;
+		if (!isNull)
+		{
+			memChunk = new char[size];
+			eye.read(memChunk, size);
+		}
 
-        p_eye.read(reinterpret_cast<char*>(&isNull), sizeof(bool));
-        if(!isNull)
-        {
-            for(int i = 0; i < length; ++i)
-            {
-                p_fieldAddress = reinterpret_cast<char*>(*addr32);
-                DeserializeType(p_fieldAddress, type, p_eye);
-                addr32++;
-            }
-        }
+		unsigned* addr32 = reinterpret_cast<unsigned*>(pMem);
+		*addr32 = reinterpret_cast<unsigned>(memChunk);
 
-        size = sizeof(unsigned) * length;
-    }
-    else
-    {
-        int s = 0;
-        for(int i = 0; i < length; ++i)
-        {
-            s = DeserializeType(p_fieldAddress, type, p_eye);
-            p_fieldAddress += s;
-            size += s;
-        }
-    }
+		size = sizeof(unsigned);
+	}
+	else
+	{
+		eye.read(pMem, size);
+	}
 
-    return size;
+	return size;
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::DeserializeString(char* p_fieldAddress, TypeNode* p_type, fstream& p_eye)
+int ObjectSerializer::DeserializeUserDefinedType(ISerializable* pMem, TypeNode* pType, bool isPtr, fstream& eye)
 {
-    int     size = 0;
-    int     length = 0;
-    char*   buffer = NULL;
-    string* str = NULL;
-    bool    isNull = false;
+	int     size = 0;
+	ISerializable* pObj = NULL;
+	bool    isNull = false;
 
-    if(p_type->Indirection)
-    {
-        unsigned* addr32 = reinterpret_cast<unsigned*>(p_fieldAddress);
-        p_eye.read(reinterpret_cast<char*>(&isNull), sizeof(bool));
+	if (isPtr)
+	{
+		unsigned* addr32;
+		eye.read(reinterpret_cast<char*>(&isNull), sizeof(bool));
+		addr32 = reinterpret_cast<unsigned*>(pMem);
 
-        if(!isNull)
-        {
-            p_eye.read(reinterpret_cast<char*>(&length), sizeof(int));
-            buffer = new char[length + 1];
-            p_eye.read(reinterpret_cast<char*>(buffer), sizeof(char) * length);
-            buffer[length] = 0;
+		if (!isNull)
+		{
+			string  typeName;
+			char    buffer[MaxTypeNameLength + 1];
 
-            str = new string(buffer);
-            addr32 = reinterpret_cast<unsigned*>(p_fieldAddress);
-        }
+			eye.read(buffer, MaxTypeNameLength + 1);
+			typeName = buffer;
+			pObj = static_cast<ISerializable*>(g_ObjectFactory.Create(typeName));
 
-        *addr32 = reinterpret_cast<unsigned>(str);
-        size = sizeof(unsigned);
-    }
-    else
-    {
-        p_eye.read(reinterpret_cast<char*>(&length), sizeof(int));
-        buffer = new char[length + 1];
-        p_eye.read(reinterpret_cast<char*>(buffer), sizeof(char) * length);
-        buffer[length] = 0;
+			PerformLateBinding(pObj, pType);
 
-        str = reinterpret_cast<string*>(p_fieldAddress);
-        *str = buffer;
-        size = sizeof(string);
-    }
+			auto objLayout = pObj->GetObjectLayout();
+			Iterator* addresses = objLayout.GetIterator();
+			unsigned* addr32;
+			for (int memberIdx = 0; addresses->MoveNext(); ++memberIdx)
+			{
+				_ASSERTE(memberIdx < pType->Children.size());
+				addr32 = reinterpret_cast<unsigned*>(addresses->Current());
+				DeserializeType(reinterpret_cast<char*>(*addr32), pType->Children[memberIdx].Ptr32, eye);
+			}
+		}
 
-    if(buffer != NULL)
-        delete[] buffer;
+		*addr32 = reinterpret_cast<unsigned>(pObj);
+		size = sizeof(unsigned);
+	}
+	else
+	{
+		pObj = reinterpret_cast<ISerializable*>(pMem);
 
-    return size;
+		auto objLayout = pObj->GetObjectLayout();
+		Iterator* addresses = objLayout.GetIterator();
+		unsigned* addr32;
+		for (int memberIdx = 0; addresses->MoveNext(); ++memberIdx)
+		{
+			_ASSERTE(memberIdx < pType->Children.size());
+			addr32 = reinterpret_cast<unsigned*>(addresses->Current());
+			DeserializeType(reinterpret_cast<char*>(*addr32), pType->Children[memberIdx].Ptr32, eye);
+		}
+
+		size = objLayout.TypeSize();
+	}
+
+	return size;
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::DeserializeContainerVector(char* p_fieldAddress, TypeNode* p_type, fstream& p_eye)
+int ObjectSerializer::DeserializeArray(char* pMem, TypeNode* pType, fstream& eye)
 {
-    // Pointer to vector is not supported
-    _ASSERTE(p_type->Indirection == false);
+	int         size = 0;
+	int         length = pType->Children[0].Val32;
+	TypeNode*   type = pType->Children[1].Ptr32;
+	bool        isNull = false;
 
-    Container* container = reinterpret_cast<Container*>(p_fieldAddress);
-    int count;
+	if (pType->Indirection)
+	{
+		unsigned* addr32 = reinterpret_cast<unsigned*>(pMem);
+		*addr32 = NULL;
 
-    p_eye.read(reinterpret_cast<char*>(&count), sizeof(int));
-    container->Clear();
+		eye.read(reinterpret_cast<char*>(&isNull), sizeof(bool));
+		if (!isNull)
+		{
+			for (int i = 0; i < length; ++i)
+			{
+				pMem = reinterpret_cast<char*>(*addr32);
+				DeserializeType(pMem, type, eye);
+				addr32++;
+			}
+		}
 
-    char* tempStorage = container->GetTemp();
-    for(int i = 0; i < count; ++i)
-    {
-        DeserializeType(tempStorage, p_type->TemplateArguments[0], p_eye);
-        container->AddTemp();
-    }
+		size = sizeof(unsigned)* length;
+	}
+	else
+	{
+		int s = 0;
+		for (int i = 0; i < length; ++i)
+		{
+			s = DeserializeType(pMem, type, eye);
+			pMem += s;
+			size += s;
+		}
+	}
 
-    return container->TypeSize();
+	return size;
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::DeserializeContainerMap(char* p_fieldAddress, TypeNode* p_type, fstream& p_eye)
+int ObjectSerializer::DeserializeString(char* pMem, TypeNode* pType, fstream& eye)
 {
-    // Pointer to map is not supported
-    _ASSERTE(p_type->Indirection == false);
+	int     size = 0;
+	int     length = 0;
+	char*   buffer = NULL;
+	string* str = NULL;
+	bool    isNull = false;
 
-    Container* container = reinterpret_cast<Container*>(p_fieldAddress);
-    int count;
+	if (pType->Indirection)
+	{
+		unsigned* addr32 = reinterpret_cast<unsigned*>(pMem);
+		eye.read(reinterpret_cast<char*>(&isNull), sizeof(bool));
 
-    p_eye.read(reinterpret_cast<char*>(&count), sizeof(int));
-    container->Clear();
+		if (!isNull)
+		{
+			eye.read(reinterpret_cast<char*>(&length), sizeof(int));
+			buffer = new char[length + 1];
+			eye.read(reinterpret_cast<char*>(buffer), sizeof(char)* length);
+			buffer[length] = 0;
 
-    char* tempStorage = container->GetTemp();
-    for(int i = 0; i < count; ++i)
-    {
-        DeserializeType(tempStorage, p_type->TemplateArguments[0], p_eye);
-        container->AddTemp();
-    }
+			str = new string(buffer);
+			addr32 = reinterpret_cast<unsigned*>(pMem);
+		}
 
-    return container->TypeSize();
+		*addr32 = reinterpret_cast<unsigned>(str);
+		size = sizeof(unsigned);
+	}
+	else
+	{
+		eye.read(reinterpret_cast<char*>(&length), sizeof(int));
+		buffer = new char[length + 1];
+		eye.read(reinterpret_cast<char*>(buffer), sizeof(char)* length);
+		buffer[length] = 0;
+
+		str = reinterpret_cast<string*>(pMem);
+		*str = buffer;
+		size = sizeof(string);
+	}
+
+	if (buffer != NULL)
+		delete[] buffer;
+
+	return size;
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::DeserializeContainerSet(char* p_fieldAddress, TypeNode* p_type, fstream& p_eye)
+int ObjectSerializer::DeserializeContainerVector(ISerializable* pMem, TypeNode* pType, fstream& eye)
 {
-    // Pointer to set is not supported
-    _ASSERTE(p_type->Indirection == false);
+	// Pointer to vector is not supported
+	_ASSERTE(pType->Indirection == false);
 
-    Container* container = reinterpret_cast<Container*>(p_fieldAddress);
-    int count;
+	auto objLayout = pMem->GetObjectLayout();
+	IContainer* pContainer = dynamic_cast<IContainer*>(pMem);
+	_ASSERTE(pContainer);
+	int count;
 
-    p_eye.read(reinterpret_cast<char*>(&count), sizeof(int));
-    container->Clear();
-    char* tempStorage0 = container->GetTemp();
+	eye.read(reinterpret_cast<char*>(&count), sizeof(int));
+	pContainer->Clear();
 
-    for(int i = 0; i < count; ++i)
-    {
-        DeserializeType(tempStorage0, p_type->TemplateArguments[0], p_eye);
-        container->AddTemp();
-    }
+	char* tempStorage = pContainer->GetTemp();
+	for (int i = 0; i < count; ++i)
+	{
+		DeserializeType(tempStorage, pType->TemplateArguments[0], eye);
+		pContainer->AddTemp();
+	}
 
-    return container->TypeSize();
+	return objLayout.TypeSize();
 }
 //----------------------------------------------------------------------------------------------
-int ObjectSerializer::DeserializePair(char* p_fieldAddress, TypeNode* p_type, fstream& p_eye)
+int ObjectSerializer::DeserializeContainerMap(ISerializable* pMem, TypeNode* pType, fstream& eye)
 {
-    // Pointer to pair is not supported
-    _ASSERTE(p_type->Indirection == false);
+	// Pointer to map is not supported
+	_ASSERTE(pType->Indirection == false);
 
-    UserObject* object = reinterpret_cast<UserObject*>(p_fieldAddress);
-    object->InitializeAddresses();
+	auto objLayout = pMem->GetObjectLayout();
+	IContainer* pContainer = dynamic_cast<IContainer*>(pMem);
+	_ASSERTE(pContainer);
+	int count;
 
-    Iterator* addresses = object->GetIterator();
-    unsigned* addr32;
-    for(int memberIdx = 0; addresses->MoveNext(); ++memberIdx)    
-    {
-        addr32 = reinterpret_cast<unsigned*>(addresses->Current());
-        DeserializeType(reinterpret_cast<char*>(*addr32), p_type->TemplateArguments[memberIdx], p_eye);
-    }
+	eye.read(reinterpret_cast<char*>(&count), sizeof(int));
+	pContainer->Clear();
 
-    return object->TypeSize();
+	char* tempStorage = pContainer->GetTemp();
+	for (int i = 0; i < count; ++i)
+	{
+		DeserializeType(tempStorage, pType->TemplateArguments[0], eye);
+		pContainer->AddTemp();
+	}
+
+	return objLayout.TypeSize();
+}
+//----------------------------------------------------------------------------------------------
+int ObjectSerializer::DeserializeContainerSet(ISerializable* pMem, TypeNode* pType, fstream& eye)
+{
+	// Pointer to set is not supported
+	_ASSERTE(pType->Indirection == false);
+
+	auto objLayout = pMem->GetObjectLayout();
+	IContainer* pContainer = dynamic_cast<IContainer*>(pMem);
+	_ASSERTE(pContainer);
+	int count;
+
+	eye.read(reinterpret_cast<char*>(&count), sizeof(int));
+	pContainer->Clear();
+	char* tempStorage0 = pContainer->GetTemp();
+
+	for (int i = 0; i < count; ++i)
+	{
+		DeserializeType(tempStorage0, pType->TemplateArguments[0], eye);
+		pContainer->AddTemp();
+	}
+
+	return objLayout.TypeSize();
+}
+//----------------------------------------------------------------------------------------------
+int ObjectSerializer::DeserializePair(ISerializable* pObj, TypeNode* pType, fstream& eye)
+{
+	// Pointer to pair is not supported
+	_ASSERTE(pType->Indirection == false);
+
+	auto objLayout = pObj->GetObjectLayout();
+	Iterator* addresses = objLayout.GetIterator();
+	unsigned* addr32;
+	for (int memberIdx = 0; addresses->MoveNext(); ++memberIdx)
+	{
+		addr32 = reinterpret_cast<unsigned*>(addresses->Current());
+		DeserializeType(reinterpret_cast<char*>(*addr32), pType->TemplateArguments[memberIdx], eye);
+	}
+
+	return objLayout.TypeSize();
 }

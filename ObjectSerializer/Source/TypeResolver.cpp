@@ -105,7 +105,7 @@ void TypeResolver::TypeMemberSubstitution( TypeData& p_tableEntry, TypeTable& p_
     TypeNode*           resultant   = NULL;
     vector<TypeChild>&  oldChildren = typeGraph->Children;
 
-    for(int i = 0; i < oldChildren.size(); ++i)
+    for(size_t i = 0; i < oldChildren.size(); ++i)
     {
         if(!oldChildren[i].IsType)
             continue;

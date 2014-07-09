@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 //----------------------------------------------------------------------------------------------
-UserObject* ObjectFactory::Create(const string& p_typeName)
+ISerializable* ObjectFactory::Create(const string& p_typeName)
 {
     _ASSERTE(!p_typeName.empty());
     ObjectFactoryMap::iterator where;
