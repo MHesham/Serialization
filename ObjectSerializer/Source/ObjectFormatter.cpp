@@ -368,23 +368,24 @@ void ObjectFormatter::FinalizeTypeTable(TypeTable& p_typeTable, ObjectFactoryMap
     CollectTemplateSpecialization(p_typeTable, p_objectTable);
 }
 //----------------------------------------------------------------------------------------------
-void ObjectFormatter::CollectTemplateSpecialization(TypeTable& p_typeTable, ObjectFactoryMap& p_objectTable)
+void ObjectFormatter::CollectTemplateSpecialization(TypeTable& typeTable, ObjectFactoryMap& objTable)
 {
-    for(ObjectFactoryMap::iterator objItr = p_objectTable.begin();
-        objItr != p_objectTable.end();
+    for(ObjectFactoryMap::iterator objItr = objTable.begin();
+        objItr != objTable.end();
         ++objItr)
     {
-        shared_ptr<UserObject> pObj(objItr->second());
-        string typeName = pObj->TypeName();
-        if(p_typeTable.find(typeName) != p_typeTable.end())
+        shared_ptr<ISerializable> pObj(objItr->second());
+        auto objLayout = pObj->GetObjectLayout();
+        string typeName = objLayout.TypeName();
+        if(typeTable.find(typeName) != typeTable.end())
         {
-            TypeData& typeTemplate = p_typeTable[typeName];
+            TypeData& typeTemplate = typeTable[typeName];
             // type has template arguments and is for sure it is specialized
             if(!typeTemplate.TypeGraph->TemplateArguments.empty())
             {
                 // 1. extract object specialization info
-                string specializedTypeName = g_ObjectFactory.FromCName(pObj->CName());
-                _ASSERTE(p_typeTable.find(specializedTypeName) == p_typeTable.end());
+                string specializedTypeName = g_ObjectFactory.FromCName(objLayout.CName());
+                _ASSERTE(typeTable.find(specializedTypeName) == typeTable.end());
 
                 // 2. parse specialization string and get specialized type graph
                 Toolbox::GetCharacterBuffer(specializedTypeName, m_buffer);
@@ -393,7 +394,7 @@ void ObjectFormatter::CollectTemplateSpecialization(TypeTable& p_typeTable, Obje
                 m_parser->Parse();
 
                 // 3. specialize a copy of the type template using the specialization info
-                g_TypeResolver.Specialize(m_parser->TypeGraph(), typeTemplate, p_typeTable);
+                g_TypeResolver.Specialize(m_parser->TypeGraph(), typeTemplate, typeTable);
 
                 delete m_parser->TypeGraph();
             }

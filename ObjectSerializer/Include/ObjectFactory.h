@@ -1,25 +1,23 @@
 #ifndef OBJECTFACTORY_H
 #define OBJECTFACTORY_H
 
-#ifndef USEROBJECT_H
-#include "UserObject.h"
-#endif
-
 #include <string>
 #include <map>
 #include <memory>
+#include "ISerializable.h"
+
 using namespace std;
 using namespace Serialization;
 
-typedef std::map<std::string, Serialization::UserObject*> ObjectTable;
+typedef std::map<std::string, Serialization::ISerializable*> ObjectTable;
 
 namespace Serialization
 {
-    typedef Serialization::UserObject* (*PfnUserObjectFactory)();
+    typedef Serialization::ISerializable* (*PfnUserObjectFactory)();
     typedef std::map<std::string, PfnUserObjectFactory> ObjectFactoryMap;
 
     template<class T>
-    UserObject* UserObjectFactory() { return new T; }
+    ISerializable* UserObjectFactory() { return new T; }
 
     class ObjectFactory
     {
@@ -27,9 +25,9 @@ namespace Serialization
         ObjectFactoryMap m_factories;
 
     public:
-        UserObject* GetObject(const string& p_typeName);
+        ISerializable* GetObject(const string& p_typeName);
         const string& FromCName(const string& p_cName);
-        UserObject* Create(const string& p_typeName);
+        ISerializable* Create(const string& p_typeName);
 
         template<class T>
         PfnUserObjectFactory AddPrototype(const char* pNameOverride = nullptr)

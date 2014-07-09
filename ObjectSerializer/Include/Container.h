@@ -1,9 +1,7 @@
 #ifndef CONTAINER_H
 #define CONTAINER_H
 
-#ifndef SERIALIZABLE_H
-    #include "ISerializable.h"
-#endif
+#include "ISerializable.h"
 
 namespace Serialization
 {
