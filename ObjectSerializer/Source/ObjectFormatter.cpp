@@ -93,7 +93,9 @@ void ObjectFormatter::ExtractTypes(string& p_sourceFileName, TypeTable& p_typeTa
     TypeNode*   lasteRoot = NULL;
 
     eye.open(p_sourceFileName.c_str());
-    _ASSERTE(eye.is_open());
+	if (!eye.is_open())
+		return;
+    //_ASSERTE(eye.is_open());
 
     int i = -1;
     while(!eye.eof())

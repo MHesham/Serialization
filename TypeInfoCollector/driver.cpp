@@ -35,6 +35,7 @@ int _tmain(int argc, LPTSTR argv[])
 	if (argc == 3)
 		g_FileManager.PopDir();
 
+#ifdef TEST
 	g_ObjectFormatter.FinalizeTypeTable(g_ObjectSerializer.TypeTable(), g_ObjectFactory.GetObjectTable());
 
 	TestClass* pTestObj1 = new TestClass(true);
@@ -49,6 +50,7 @@ int _tmain(int argc, LPTSTR argv[])
 
 	TestClass* pTestObj2 = new TestClass();
 	g_ObjectSerializer.Deserialize(pTestObj2, "TestObj.bin");
+#endif // TEST
 
 	return 0;
 }
