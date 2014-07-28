@@ -8,6 +8,8 @@
 #include "Toolbox.h"
 #include "CompilerSettings.h"
 
+using namespace Unreal;
+
 LexicalAnalyzer::LexicalAnalyzer(string p_lexerDefinitionPath)
 {
     Initialize(p_lexerDefinitionPath);

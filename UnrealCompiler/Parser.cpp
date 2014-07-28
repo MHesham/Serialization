@@ -2,6 +2,8 @@
 #include "ErrorData.h"
 #include <cassert>
 
+using namespace Unreal;
+
 Parser::Parser(LexicalAnalyzer* p_scanner)
 {
     m_scanner = p_scanner;

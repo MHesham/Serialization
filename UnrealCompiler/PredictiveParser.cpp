@@ -4,6 +4,8 @@
 #include "SDTScheme.h"
 #include "ErrorData.h"
 
+using namespace Unreal;
+
 void PredictiveParser::Initialize()
 {
     m_grammar = new SDTScheme;

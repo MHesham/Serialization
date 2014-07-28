@@ -19,6 +19,7 @@
 #endif
 #include <memory>
 
+string g_SerializationSystemWorkingDir = ".\\";
 string g_TypeInfoPath;
 string g_TypeLexerFilePath;
 string g_TypeNamesFilePath;
@@ -26,15 +27,15 @@ string g_SerializationTag;
 
 ObjectFormatter::ObjectFormatter() : m_lexer(NULL), m_parser(NULL), m_buffer(NULL)
 {
-    g_TypeInfoPath                  = "TypeInfo\\";
-    g_TypeNamesFilePath             = g_TypeInfoPath + "TypeNames.list";
-    g_TypeLexerFilePath             = g_TypeInfoPath + "TypeLexer.dfa";
-    g_SerializationTag              = "///> [Serializable]";
+    g_TypeInfoPath = g_SerializationSystemWorkingDir + "TypeInfo\\";
+    g_TypeNamesFilePath = g_TypeInfoPath + "TypeNames.list";
+    g_TypeLexerFilePath = g_TypeInfoPath + "TypeLexer.dfa";
+    g_SerializationTag = "///> [Serializable]";
 
-    m_headerNameMap["class"]        = HATTR_Class;
-    m_headerNameMap["type"]         = HATTR_Type;
-    m_headerNameMap["parent"]       = HATTR_Parent;
-    m_headerNameMap["alias"]        = HATTR_Alias;
+    m_headerNameMap["class"] = HATTR_Class;
+    m_headerNameMap["type"] = HATTR_Type;
+    m_headerNameMap["parent"] = HATTR_Parent;
+    m_headerNameMap["alias"] = HATTR_Alias;
 
     InitializeParsing();
 }
@@ -43,14 +44,14 @@ ObjectFormatter::~ObjectFormatter()
 {
     Toolbox::MemoryClean(m_lexer);
     Toolbox::MemoryClean(m_parser);
-} 
+}
 //----------------------------------------------------------------------------------------------
 void ObjectFormatter::WriteTypeTable(const string& p_sourceCodeDir)
 {
     ReadSourceFiles(p_sourceCodeDir.c_str());
 
     TypeTable typeTable;
-    for(vector<string>::iterator fileNameItr = m_sourceFiles.begin();
+    for (vector<string>::iterator fileNameItr = m_sourceFiles.begin();
         fileNameItr != m_sourceFiles.end();
         ++fileNameItr)
     {
@@ -59,11 +60,11 @@ void ObjectFormatter::WriteTypeTable(const string& p_sourceCodeDir)
 
     g_TypeResolver.Resolve(typeTable);
 
-    for(TypeTable::iterator typeItr = typeTable.begin();
+    for (TypeTable::iterator typeItr = typeTable.begin();
         typeItr != typeTable.end();
         ++typeItr)
     {
-        if(typeTable[typeItr->first].IsAlias)
+        if (typeTable[typeItr->first].IsAlias)
             continue;
 
         typeTable[typeItr->first].Write(g_TypeInfoPath);
@@ -80,9 +81,9 @@ void ObjectFormatter::ReadSourceFiles(const string& p_sourceCodeDir)
 //----------------------------------------------------------------------------------------------
 void ObjectFormatter::InitializeParsing()
 {
-    m_lexer     = new LexicalAnalyzer(g_TypeLexerFilePath);
-    m_parser    = new TypeDeclarationParser(m_lexer);
-    m_buffer    = new CharacterBuffer();
+    m_lexer = new LexicalAnalyzer(g_TypeLexerFilePath);
+    m_parser = new TypeDeclarationParser(m_lexer);
+    m_buffer = new CharacterBuffer();
 }
 //----------------------------------------------------------------------------------------------
 void ObjectFormatter::ExtractTypes(string& p_sourceFileName, TypeTable& p_typeTable)
@@ -93,25 +94,25 @@ void ObjectFormatter::ExtractTypes(string& p_sourceFileName, TypeTable& p_typeTa
     TypeNode*   lasteRoot = NULL;
 
     eye.open(p_sourceFileName.c_str());
-	if (!eye.is_open())
-		return;
+    if (!eye.is_open())
+        return;
     //_ASSERTE(eye.is_open());
 
     int i = -1;
-    while(!eye.eof())
+    while (!eye.eof())
     {
         getline(eye, line);
         ++i;
 
-        if(i == 0 && line != g_SerializationTag)
+        if (i == 0 && line != g_SerializationTag)
             break;
-        else if(i == 0 && line == g_SerializationTag)
+        else if (i == 0 && line == g_SerializationTag)
             continue;
 
-        if(line.empty())
+        if (line.empty())
             continue;
 
-        if(IsFormatLine(line, format))
+        if (IsFormatLine(line, format))
         {
             ParseFormat(format, p_typeTable, lasteRoot);
         }
@@ -130,26 +131,26 @@ bool ObjectFormatter::IsFormatLine(string& p_line, string& p_format)
     stream.unsetf(ios::skipws);
     stream.str(p_line);
 
-    while(stream >> c)
+    while (stream >> c)
     {
         cursor++;
-        switch(state)
+        switch (state)
         {
         case 0:
-            if(c == '/') state = 1;
-            else if(c == ' ' || c == '\t') state = 0;
+            if (c == '/') state = 1;
+            else if (c == ' ' || c == '\t') state = 0;
             else state = 5;
             break;
         case 1:
-            if(c == '/') state = 2;
+            if (c == '/') state = 2;
             else state = 5;
             break;
         case 2:
-            if(c == '/') state = 3;
+            if (c == '/') state = 3;
             else state = 5;
             break;
         case 3:
-            if(c == '>') state = 4;
+            if (c == '>') state = 4;
             else state = 5;
             break;
         case 4:
@@ -172,17 +173,17 @@ void ObjectFormatter::ParseFormat(string& p_formatLine, TypeTable& p_typeTable, 
     {
         GetMemberNode(attributes, p_typeTable, p_lastTypeRoot);
     }
-    else if(attributes.find(HATTR_Class) != attributes.end())
+    else if (attributes.find(HATTR_Class) != attributes.end())
     {
         GetNewTypeNode(attributes, p_typeTable, p_lastTypeRoot);
     }
-    else if(attributes.find(HATTR_Parent) != attributes.end())
+    else if (attributes.find(HATTR_Parent) != attributes.end())
     {
         GetParentNode(attributes, p_typeTable, p_lastTypeRoot);
     }
-    else if(attributes.find(HATTR_Alias) != attributes.end())
+    else if (attributes.find(HATTR_Alias) != attributes.end())
     {
-        GetAliasNode(attributes,  p_typeTable, p_lastTypeRoot);
+        GetAliasNode(attributes, p_typeTable, p_lastTypeRoot);
     }
 }
 //----------------------------------------------------------------------------------------------
@@ -194,7 +195,7 @@ void ObjectFormatter::GetAttributes(string& p_line, Attributes& p_attributes)
     Split(p_line, ' ', pairs);
     _ASSERTE(pairs.size() >= 1);
 
-    for(int i = 0, size = pairs.size(); i < size; ++i)
+    for (int i = 0, size = pairs.size(); i < size; ++i)
     {
         string& attribute = pairs[i];
 
@@ -218,9 +219,9 @@ void ObjectFormatter::Split(string& p_str, char p_delim, vector<string>& p_token
     str.str(p_str);
     string token;
 
-    while(getline(str, token, p_delim))
+    while (getline(str, token, p_delim))
     {
-        if(token.empty())
+        if (token.empty())
             continue;
         p_tokens.push_back(token);
     }
@@ -241,7 +242,7 @@ void ObjectFormatter::GetMemberNode(Attributes& p_attributes, TypeTable& p_typeT
     p_lastTypeRoot->Children.push_back(TypeChild(specializedType));
 }
 //----------------------------------------------------------------------------------------------
-void ObjectFormatter::GetNewTypeNode(Attributes& p_attributes,  TypeTable& p_typeTable, TypeNode*& p_lastTypeRoot)
+void ObjectFormatter::GetNewTypeNode(Attributes& p_attributes, TypeTable& p_typeTable, TypeNode*& p_lastTypeRoot)
 {
     TypeNode* newType = NULL;
 
@@ -269,7 +270,7 @@ void ObjectFormatter::GetNewTypeNode(Attributes& p_attributes,  TypeTable& p_typ
     p_lastTypeRoot = newType;
 }
 //----------------------------------------------------------------------------------------------
-void ObjectFormatter::GetParentNode(Attributes& p_attributes,  TypeTable& p_typeTable, TypeNode*& p_lastTypeRoot)
+void ObjectFormatter::GetParentNode(Attributes& p_attributes, TypeTable& p_typeTable, TypeNode*& p_lastTypeRoot)
 {
     _ASSERTE(p_attributes.find(HATTR_Parent) != p_attributes.end());
 
@@ -288,7 +289,7 @@ void ObjectFormatter::GetParentNode(Attributes& p_attributes,  TypeTable& p_type
     childTableEntry.Parents.push_back(parent);
 }
 //----------------------------------------------------------------------------------------------
-void ObjectFormatter::GetAliasNode(Attributes& p_attributes,  TypeTable& p_typeTable, TypeNode*& p_lastTypeRoot)
+void ObjectFormatter::GetAliasNode(Attributes& p_attributes, TypeTable& p_typeTable, TypeNode*& p_lastTypeRoot)
 {
     Toolbox::GetCharacterBuffer(p_attributes[HATTR_Alias], m_buffer);
     m_lexer->SetCodeBuffer(m_buffer);
@@ -301,7 +302,7 @@ void ObjectFormatter::GetAliasNode(Attributes& p_attributes,  TypeTable& p_typeT
     if (p_typeTable.find(aliasNode->UserDefinedType) != p_typeTable.end())
         DebugBreak();
 
-    if(p_lastTypeRoot != NULL && !p_lastTypeRoot->TemplateArguments.empty())
+    if (p_lastTypeRoot != NULL && !p_lastTypeRoot->TemplateArguments.empty())
         aliasNode->SetTemplateArguments(p_lastTypeRoot->TemplateArguments);
 
     TypeData& tableEntry = p_typeTable[aliasNode->UserDefinedType];
@@ -320,11 +321,11 @@ void ObjectFormatter::WriteTypeNames()
 
     pen.write(reinterpret_cast<char*>(&size), sizeof(int));
 
-    for(size_t i = 0; i < m_typeNames.size(); ++i)
+    for (size_t i = 0; i < m_typeNames.size(); ++i)
     {
         _ASSERTE(m_typeNames[i].size() <= MaxTypeNameLength);
         strcpy_s(buffer, m_typeNames[i].c_str());
-        pen.write(reinterpret_cast<char*>(buffer), sizeof(char) * (MaxTypeNameLength + 1));
+        pen.write(reinterpret_cast<char*>(buffer), sizeof(char)* (MaxTypeNameLength + 1));
     }
 
     pen.close();
@@ -333,7 +334,7 @@ void ObjectFormatter::WriteTypeNames()
 void ObjectFormatter::ReadTypeTable(TypeTable& p_typeTable)
 {
     ReadTypeNames();
-    for(vector<string>::iterator typeNameItr = m_typeNames.begin();
+    for (vector<string>::iterator typeNameItr = m_typeNames.begin();
         typeNameItr != m_typeNames.end();
         ++typeNameItr)
     {
@@ -355,9 +356,9 @@ void ObjectFormatter::ReadTypeNames()
     eye.read(reinterpret_cast<char*>(&size), sizeof(int));
 
     m_typeNames.resize(size);
-    for(size_t i = 0; i < m_typeNames.size(); ++i)
+    for (size_t i = 0; i < m_typeNames.size(); ++i)
     {
-        eye.read(reinterpret_cast<char*>(buffer), sizeof(char) * (MaxTypeNameLength + 1));
+        eye.read(reinterpret_cast<char*>(buffer), sizeof(char)* (MaxTypeNameLength + 1));
         m_typeNames[i] = buffer;
     }
 
@@ -372,18 +373,18 @@ void ObjectFormatter::FinalizeTypeTable(TypeTable& p_typeTable, ObjectFactoryMap
 //----------------------------------------------------------------------------------------------
 void ObjectFormatter::CollectTemplateSpecialization(TypeTable& typeTable, ObjectFactoryMap& objTable)
 {
-    for(ObjectFactoryMap::iterator objItr = objTable.begin();
+    for (ObjectFactoryMap::iterator objItr = objTable.begin();
         objItr != objTable.end();
         ++objItr)
     {
         shared_ptr<ISerializable> pObj(objItr->second());
         auto objLayout = pObj->GetObjectLayout();
         string typeName = objLayout.TypeName();
-        if(typeTable.find(typeName) != typeTable.end())
+        if (typeTable.find(typeName) != typeTable.end())
         {
             TypeData& typeTemplate = typeTable[typeName];
             // type has template arguments and is for sure it is specialized
-            if(!typeTemplate.TypeGraph->TemplateArguments.empty())
+            if (!typeTemplate.TypeGraph->TemplateArguments.empty())
             {
                 // 1. extract object specialization info
                 string specializedTypeName = g_ObjectFactory.FromCName(objLayout.CName());

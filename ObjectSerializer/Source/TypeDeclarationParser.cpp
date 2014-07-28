@@ -2,6 +2,8 @@
 #include "TypeDeclarationParser.h"
 #endif
 
+using namespace Unreal;
+
 TypeDeclarationParser::TypeDeclarationParser(LexicalAnalyzer* p_scanner) : m_scanner(p_scanner) 
 {
     m_builtInTypes["bool"]      = DTYPE_Bool;

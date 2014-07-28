@@ -5,8 +5,11 @@
 #include "DFAState.h"
 #include <cassert>
 
-vector<TokenType*> g_TokenTypesMap(MaxTokenTypes, NULL);
-int EOFTypeId;
+using namespace std;
+using namespace Unreal;
+
+vector<TokenType*> Unreal::g_TokenTypesMap(MaxTokenTypes, NULL);
+int Unreal::EOFTypeId;
 
 //////////////////////////////////////////////////////////////////////////
 LanguageReader& LanguageReader::Instance()
