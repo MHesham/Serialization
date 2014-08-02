@@ -146,7 +146,7 @@ Token* LexicalAnalyzer::EndOfFileToken()
 }
 
 //////////////////////////////////////////////////////////////////////////
-Token* LexicalAnalyzer::GetNextToken()
+Unreal::Token* LexicalAnalyzer::GetNextToken()
 {
     if(IsEndOfFile())
         return EndOfFileToken();

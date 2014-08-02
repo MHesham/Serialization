@@ -5,11 +5,12 @@
 #include "DFAState.h"
 #include <cassert>
 
-using namespace std;
+using namespace std; 
 using namespace Unreal;
 
-vector<TokenType*> Unreal::g_TokenTypesMap(MaxTokenTypes, NULL);
-int Unreal::EOFTypeId;
+vector<Unreal::UTokenType*> g_TokenTypesMap(MaxTokenTypes, NULL);
+
+int EOFTypeId;
 
 //////////////////////////////////////////////////////////////////////////
 LanguageReader& LanguageReader::Instance()
@@ -81,7 +82,7 @@ void LanguageReader::ReadTokenTypes(ifstream& p_eye )
     string          line;
     string          tokenTypeName;
     stringstream    stream;
-    TokenType*      tokenType;
+    UTokenType*      tokenType;
 
     m_reservedWordsToTokenTypeIdMap.clear();
     while(getline(p_eye, line))
@@ -99,7 +100,7 @@ void LanguageReader::ReadTokenTypes(ifstream& p_eye )
 
         stream >> tokenTypeId;
         
-        tokenType = new TokenType(tokenTypeId, tokenTypeName);
+        tokenType = new UTokenType(tokenTypeId, tokenTypeName);
 
         g_TokenTypesMap[tokenTypeId] = tokenType;
         m_tokenTypeTable[tokenTypeName] = tokenTypeId;
@@ -132,7 +133,7 @@ void LanguageReader::ReadTokenTypes(ifstream& p_eye )
     }
 
     EOFTypeId = tokenTypeId + 1;
-    g_TokenTypesMap[EOFTypeId] = new TokenType(EOFTypeId, "EOF");
+    g_TokenTypesMap[EOFTypeId] = new UTokenType(EOFTypeId, "EOF");
 
 }
 
