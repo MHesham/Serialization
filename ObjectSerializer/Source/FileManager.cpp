@@ -2,6 +2,8 @@
     #include "FileManager.h"
 #endif
 
+#pragma warning(disable:4996)
+
 #include <iostream>
 #include <cassert>
 //----------------------------------------------------------------------------------------------

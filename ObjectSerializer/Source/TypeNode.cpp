@@ -6,6 +6,8 @@
 #include <string>
 #include <algorithm>
 
+#pragma warning(push, 3)
+
 unsigned LastTypeNodeId = 0;
 unsigned TypeNodesCount = 0;
 
@@ -431,3 +433,5 @@ string  TypeNode::ToString(DataType p_type)
 
     return "";
 }
+
+#pragma warning(pop)
